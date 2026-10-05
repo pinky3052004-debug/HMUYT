@@ -60,15 +60,12 @@ def append_to_uploaded_file(drive_service, file_id, video_name, current_list):
 # --- JSON Metadata ရှာဖွေဖတ်ရှုသည့် Function ---
 def get_metadata_for_video(drive_service, folder_id, video_name):
     """ဗီဒီယိုနာမည်နဲ့ သက်ဆိုင်တဲ့ မူရင်း ID ကိုရှာပြီး ၎င်းနဲ့ကိုက်ညီတဲ့ metadata.json ကို Drive ထဲမှာ ရှာဖွေဖတ်ရှုသည်"""
-    # ဥပမာ - video_name က "1500.mp4" ဆိုရင် '1500' (သို့) နာမည်တူ JSON ကို ရှာမည်
     base_name = os.path.splitext(video_name)[0]
     
-    # ပုံစံ ၁။ metadata_{base_name}.json (သို့) {base_name}.json ဖိုင်များကို ရှာရန်
     query = f"'{folder_id}' in parents and (name='metadata.json' or name='{base_name}.json' or name='metadata_{base_name}.json') and trashed=false"
     results = drive_service.files().list(q=query, fields="files(id, name)").execute()
     files = results.get('files', [])
     
-    # အကယ်၍ သီးသန့် JSON မတွေ့ခဲ့လျှင် Folder ထဲရှိ metadata.json အားလုံးထဲက id နဲ့ ကိုက်တာကို ရှာမည်
     if not files:
         query_all = f"'{folder_id}' in parents and name contains 'json' and trashed=false"
         results_all = drive_service.files().list(q=query_all, fields="files(id, name)").execute()
@@ -80,7 +77,6 @@ def get_metadata_for_video(drive_service, folder_id, video_name):
             content = request.execute()
             data = json.loads(content.decode('utf-8'))
             
-            # JSON ထဲမှာ List ဖြစ်နေတာလား ဒါမှမဟုတ် Single Object လား စစ်ဆေးခြင်း
             if isinstance(data, list):
                 for item in data:
                     if str(item.get('id')) == base_name or item.get('video_name') == video_name:
@@ -132,21 +128,21 @@ def main():
             file_num = int(match.group(1)) if match else float('inf')
             pending_videos.append((file_num, item))
 
-    # နံပါတ်စဉ်အလိုက် စီစဉ်ခြင်း (1.mp4, 2.mp4, ...)
-    pending_videos.sort(key=lambda x: x[0])
+    # 🔄 အပြောင်းအလဲ - နံပါတ်အကြီးမှ အငယ်သို့ စီစဉ်ခြင်း (reverse=True)
+    pending_videos.sort(key=lambda x: x[0], reverse=True)
 
     if not pending_videos:
         print("တင်ရန် ဗီဒီယိုအသစ် မတွေ့ရှိပါ။")
         return
 
-    # တစ်ကြိမ်လျှင် အများဆုံး ၅ ဖိုင်
+    # တစ်ကြိမ်လျှင် အများဆုံး ၄ ဖိုင်
     videos_to_upload = pending_videos[:4]
     
     schedule_slots = [ 
         (8, 30),
         (11, 30),
         (16, 30), 
-        (19, 30)   
+        (19, 30)    
     ]
 
     mmt_tz = timezone(timedelta(hours=6, minutes=30))
@@ -160,7 +156,6 @@ def main():
         hour, minute = schedule_slots[index]
         slot_time = now_mmt.replace(hour=hour, minute=minute, second=0, microsecond=0)
         
-        # 💡 အချိန်လွန်သွားပါက နောက်တစ်နေ့သို့ မပြောင်းတော့ဘဲ ထို ဗီဒီယိုကို မတင်ဘဲ Skip လုပ်ပါမည်
         if slot_time <= now_mmt:
             print(f"\n⚠️ [{index+1}/{len(videos_to_upload)}] Skip - {video_name} အတွက် MMT {hour:02d}:{minute:02d} အချိန်သည် လွန်သွားခဲ့ပြီဖြစ်၍ မတင်တော့ပါ။")
             continue
@@ -188,7 +183,6 @@ def main():
                 video_tags = meta.get('video_tags', ['shorts', 'trending'])
                 print(f"✨ Metadata JSON အောင်မြင်စွာ တွေ့ရှိပြီး အသုံးပြုပါမည် - Title: {video_title[:30]}...")
             else:
-                # JSON မတွေ့ပါက Default သုံးမည်
                 video_title = "#hsu #beautiful #foryou #dance #shorts #youtubeshorts #အကိတ်တလိုင်း #fypシ゚viral #TrendingMM"
                 video_desc = "#hsu #beautiful #2d3d #live #foryou #dance #shorts #youtubeshorts #အကိတ်တလိုင်း #fypシ゚viral #TrendingMM #fyp"
                 video_tags = ['hsu', 'myanmar tiktok', 'smart', 'shorts', 'trending']
@@ -231,7 +225,6 @@ def main():
             print(f"❌ Error ဖြစ်ပေါ်ခဲ့သည် ({video_name}): {e}")
 
         finally:
-            # Local Temp ဖိုင်အား ရှင်းလင်းခြင်း
             if os.path.exists(local_filename):
                 os.remove(local_filename)
 
